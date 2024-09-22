@@ -52,12 +52,6 @@ class AdjacencyMatrixFA:
         }
 
     def accepts(self, word: Iterable[Symbol]) -> bool:
-        """
-        Checks if given word is accepted by this automaton.
-
-        :param word: Symbol iterable to check
-        :return: True if word is accepted, False otherwise
-        """
         word = list(word)
 
         @dataclass(frozen=True)
