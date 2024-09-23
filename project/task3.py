@@ -14,50 +14,44 @@ from project.task2 import graph_to_nfa, regex_to_dfa
 
 class AdjacencyMatrixFA:
     def __init__(self, fa: NFA | None):
-        self.start_states: set[int] = set()
-        self.final_states: set[int] = set()
-
         if fa is None:
+            self.start_states: set[int] = set()
+            self.final_states: set[int] = set()
             self.states: dict[Any, int] = {}
-            self.sym_to_adj_matrix: dict[Symbol, csr_array] = {}
+            self.boolean_decomposition: dict[Symbol, csr_array] = {}
             return
 
         graph = fa.to_networkx()
-
         self.states: dict[Any, int] = {st: i for (i, st) in enumerate(graph.nodes)}
-        transitions: dict[Symbol, NDArray[bool_]] = defaultdict(
+        number_of_states = len(self.states)
+        self.start_states = set(self.states[st] for st in fa.start_states)
+        self.final_states = set(self.states[st] for st in fa.final_states)
+
+        transitions = defaultdict(
             lambda: np.zeros(
-                (len(self.states), len(self.states)),
+                (number_of_states, number_of_states),
                 dtype=bool_,
             )
         )
 
-        # fill start and final states
-        for state, data in graph.nodes(data=True):
-            if data.get("is_start"):
-                self.start_states.add(self.states[state])
-            if data.get("is_final"):
-                self.final_states.add(self.states[state])
+        for st1, st2, label in graph.edges(data="label"):
+            if not label:
+                continue
+            sym = Symbol(label)
+            transitions[sym][self.states[st1], self.states[st2]] = True
 
-        # build transition matrix for each symbol
-        for idx1, idx2, sym in (
-            (self.states[st1], self.states[st2], Symbol(label))
-            for st1, st2, label in graph.edges(data="label")
-            if label
-        ):
-            transitions[sym][idx1, idx2] = True
-
-        self.sym_to_adj_matrix: dict[Symbol, csr_array] = {
+        self.boolean_decomposition = {
             sym: csr_array(matrix) for (sym, matrix) in transitions.items()
         }
 
     def accepts(self, word: Iterable[Symbol]) -> bool:
-        word = list(word)
-
         @dataclass(frozen=True)
         class Config:
             state: int
             word: list[Symbol]
+
+        word = list(word)
+        number_of_states = len(self.states)
 
         stack = [Config(st, word) for st in self.start_states]
         while stack:
@@ -68,28 +62,23 @@ class AdjacencyMatrixFA:
                 continue
 
             sym = cfg.word[0]
-            adj = self.sym_to_adj_matrix[sym]
+            adj = self.boolean_decomposition[sym]
             if adj is None:
                 continue
 
-            for next_state in range(len(self.states)):
+            for next_state in range(number_of_states):
                 if adj[cfg.state, next_state]:
                     stack.append(Config(next_state, cfg.word[1:]))
-
         return False
 
     def transitive_closure(self) -> NDArray[bool_]:
-        if not self.sym_to_adj_matrix:
-            return np.diag(np.ones(len(self.states), dtype=bool_))
+        number_of_states = len(self.states)
+        if not self.boolean_decomposition:
+            return np.eye(number_of_states, dtype=bool_)
 
-        combined = sum(self.sym_to_adj_matrix.values())
+        combined: csr_array = sum(self.boolean_decomposition.values())
         combined.setdiag(True)
-        tc = combined.toarray()
-        for pow in range(2, len(self.states) + 1):
-            prev = tc
-            tc = np.linalg.matrix_power(tc, pow)
-            if np.array_equal(prev, tc):
-                break
+        tc = np.linalg.matrix_power(combined.toarray(), number_of_states)
         return tc
 
     def is_empty(self) -> bool:
@@ -116,12 +105,12 @@ def intersect_automata(
 
         result.states[(st1, st2)] = result_idx
 
-    for sym, adj1 in fa1.sym_to_adj_matrix.items():
-        adj2 = fa2.sym_to_adj_matrix.get(sym)
-        if adj2 is None:
+    for sym, adj1 in fa1.boolean_decomposition.items():
+        if sym not in fa2.boolean_decomposition:
             continue
 
-        result.sym_to_adj_matrix[sym] = kron(adj1, adj2, format="csr")
+        adj2 = fa2.boolean_decomposition[sym]
+        result.boolean_decomposition[sym] = kron(adj1, adj2, format="csr")
 
     return result
 
