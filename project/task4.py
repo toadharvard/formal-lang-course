@@ -65,6 +65,7 @@ def ms_bfs_based_rpq(
     nfa_index_to_state = {index: state for state, index in mnfa.states.items()}
 
     inter_start_states = product(mdfa.start_states, mnfa.start_states)
+
     k = len(mdfa.start_states) * len(mnfa.start_states)
 
     symbols = mdfa.boolean_decomposition.keys() & mnfa.boolean_decomposition.keys()
@@ -83,10 +84,16 @@ def ms_bfs_based_rpq(
         front = new_front > visited
         visited += front
 
-    return set(
-        (nfa_index_to_state[start], nfa_index_to_state[reached])
-        for dfa_final in mdfa.final_states
-        for i, start in enumerate(mnfa.start_states)
-        for reached in visited[n * i : n * (i + 1)].getrow(dfa_final).indices
-        if reached in mnfa.final_states
-    )
+    result = set()
+    for dfa_final in mdfa.final_states:
+        for i, start in enumerate(mnfa.start_states):
+            block = visited[n * i : n * (i + 1)]
+            for reached in block.getrow(dfa_final).indices:
+                if reached in mnfa.final_states:
+                    result.add(
+                        (
+                            nfa_index_to_state[start],
+                            nfa_index_to_state[reached],
+                        )
+                    )
+    return result
