@@ -10,11 +10,8 @@ from helper import generate_rnd_start_and_final
 from rpq_concrete_cases import CASES_RPQ, CaseRPQ
 
 # Fix import statements in try block to run tests
-try:
-    from project.task3 import tensor_based_rpq
-    from project.task4 import ms_bfs_based_rpq
-except ImportError:
-    pytestmark = pytest.mark.skip("Task 4 is not ready to test!")
+from project.task3 import tensor_based_rpq
+from project.task4 import ms_bfs_based_rpq
 
 
 @pytest.fixture(scope="class", params=range(5))
