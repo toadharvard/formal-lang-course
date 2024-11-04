@@ -86,6 +86,10 @@ class AdjacencyMatrixFA:
         return self._states_indices
 
     @property
+    def indices_states(self) -> dict[int, State]:
+        return {v: k for k, v in self._states_indices.items()}
+
+    @property
     def start_states_indices(self) -> set[int]:
         return self._start_states_indices
 
